@@ -445,67 +445,38 @@ class MainActivity : AppCompatActivity() {
             binding.input.isCursorVisible = true
         }
 
-        lifecycleScope.launch(Dispatchers.Default) {
-            withContext(Dispatchers.Main) {
-                // Vibrate when key pressed
-                keyVibration(view)
-            }
+        keyVibration(view)
 
-            val formerValue = binding.input.text.toString()
-            val cursorPosition = binding.input.selectionStart
-            val leftValue = formerValue.subSequence(0, cursorPosition).toString()
+        val formerValue = binding.input.text.toString()
+        val cursorPosition = binding.input.selectionStart
+        val leftValue = formerValue.substring(0, cursorPosition)
+        val rightValue = formerValue.substring(cursorPosition)
+
+        if (value == decimalSeparatorSymbol) {
+            val isNumberCharacter: (Char) -> Boolean = {
+                it.isDigit() || it == decimalSeparatorSymbol[0] || it == groupingSeparatorSymbol[0]
+            }
+            val numberBefore = leftValue.takeLastWhile(isNumberCharacter)
+            val numberAfter = rightValue.takeWhile(isNumberCharacter)
+            if (decimalSeparatorSymbol in numberBefore || decimalSeparatorSymbol in numberAfter) {
+                return
+            }
+        }
+
+        val newValue = leftValue + value + rightValue
+        val newValueFormatted =
+            NumberFormatter.format(newValue, decimalSeparatorSymbol, groupingSeparatorSymbol)
+        binding.input.setText(newValueFormatted)
+
+        if (isValueInt) {
+            val cursorOffset = newValueFormatted.length - newValue.length
+            binding.input.setSelection(cursorPosition + value.length + cursorOffset)
+        } else {
             val leftValueFormatted =
                 NumberFormatter.format(leftValue, decimalSeparatorSymbol, groupingSeparatorSymbol)
-            val rightValue = formerValue.subSequence(cursorPosition, formerValue.length).toString()
-
-            val newValue = leftValue + value + rightValue
-
-            val newValueFormatted =
-                NumberFormatter.format(newValue, decimalSeparatorSymbol, groupingSeparatorSymbol)
-
-            withContext(Dispatchers.Main) {
-                // Avoid two decimalSeparator in the same number
-                // when you click on the decimalSeparator button
-                if (value == decimalSeparatorSymbol && decimalSeparatorSymbol in binding.input.text.toString()) {
-                    if (binding.input.text.toString().isNotEmpty()) {
-                        var lastNumberBefore = ""
-                        if (cursorPosition > 0 && binding.input.text.toString()
-                                .substring(0, cursorPosition)
-                                .last() in "0123456789\\$decimalSeparatorSymbol"
-                        ) {
-                            lastNumberBefore = NumberFormatter.extractNumbers(
-                                binding.input.text.toString().substring(0, cursorPosition),
-                                decimalSeparatorSymbol
-                            ).last()
-                        }
-                        var firstNumberAfter = ""
-                        if (cursorPosition < binding.input.text.length - 1) {
-                            firstNumberAfter = NumberFormatter.extractNumbers(
-                                binding.input.text.toString()
-                                    .substring(cursorPosition, binding.input.text.length),
-                                decimalSeparatorSymbol
-                            ).first()
-                        }
-                        if (decimalSeparatorSymbol in lastNumberBefore) { // || decimalSeparatorSymbol in firstNumberAfter) {
-                            return@withContext
-                        }
-                    }
-                }
-
-                // Update Display
-                binding.input.setText(newValueFormatted)
-
-                // Set cursor position
-                if (isValueInt) {
-                    val cursorOffset = newValueFormatted.length - newValue.length
-                    binding.input.setSelection(cursorPosition + value.length + cursorOffset)
-                } else {
-                    val desiredCursorPosition = (leftValueFormatted.length + value.length)
-                    // Limit the cursor position to the length of the input
-                    val safeCursorPosition = desiredCursorPosition.coerceAtMost(binding.input.text.length)
-                    binding.input.setSelection(safeCursorPosition)
-                }
-            }
+            val desiredCursorPosition = leftValueFormatted.length + value.length
+            val safeCursorPosition = desiredCursorPosition.coerceAtMost(binding.input.text.length)
+            binding.input.setSelection(safeCursorPosition)
         }
     }
 
@@ -957,6 +928,8 @@ class MainActivity : AppCompatActivity() {
             keyVibration(view)
 
             val calculation = binding.input.text.toString()
+
+            Expression().addParenthesis(calculation)
 
             if (calculation != "") {
 
